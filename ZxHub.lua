@@ -14,6 +14,7 @@ local jumpEnabled = false
 local noclipEnabled = false
 local espEnabled = false
 local freecamEnabled = false
+local nightVisionEnabled = false
 
 local flySpeed = 8
 local walkSpeed = 16
@@ -227,7 +228,7 @@ downBtn.Font = Enum.Font.GothamBold
 downBtn.TextSize = 24
 Instance.new("UICorner", downBtn).CornerRadius = UDim.new(0,10)
 
--- ================= MOVE BUTTONS (ซ้าย/ขวา/หน้า/หลัง) =================
+-- ================= MOVE BUTTONS =================
 local moveForwardBtn = Instance.new("TextButton", gui)
 moveForwardBtn.Size = UDim2.new(0,60,0,60)
 moveForwardBtn.Position = UDim2.new(0,80,0.7,0)
@@ -272,7 +273,6 @@ moveRightBtn.Font = Enum.Font.GothamBold
 moveRightBtn.TextSize = 24
 Instance.new("UICorner", moveRightBtn).CornerRadius = UDim.new(0,10)
 
--- bind move buttons
 moveForwardBtn.InputBegan:Connect(function(i)
 	if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then moveForward = true end
 end)
@@ -524,6 +524,42 @@ local function stopESP()
 	for _, p in ipairs(game.Players:GetPlayers()) do removeESP(p) end
 end
 
+-- ================= NIGHT VISION =================
+local nightVisionLight
+local savedAmbient
+local savedOutdoor
+local savedBrightness
+
+local function startNightVision()
+	local Lighting = game:GetService("Lighting")
+	savedAmbient = Lighting.Ambient
+	savedOutdoor = Lighting.OutdoorAmbient
+	savedBrightness = Lighting.Brightness
+	Lighting.Ambient = Color3.fromRGB(255,255,255)
+	Lighting.OutdoorAmbient = Color3.fromRGB(255,255,255)
+	Lighting.Brightness = 10
+	local char = getChar()
+	local root = char:FindFirstChild("HumanoidRootPart")
+	if root then
+		nightVisionLight = Instance.new("PointLight")
+		nightVisionLight.Brightness = 10
+		nightVisionLight.Range = 60
+		nightVisionLight.Color = Color3.fromRGB(255,255,255)
+		nightVisionLight.Parent = root
+	end
+end
+
+local function stopNightVision()
+	local Lighting = game:GetService("Lighting")
+	if savedAmbient then Lighting.Ambient = savedAmbient end
+	if savedOutdoor then Lighting.OutdoorAmbient = savedOutdoor end
+	if savedBrightness then Lighting.Brightness = savedBrightness end
+	if nightVisionLight then
+		nightVisionLight:Destroy()
+		nightVisionLight = nil
+	end
+end
+
 -- ================= CREATE ROW =================
 local function createRow(parent, name, yPos, getVal, setVal, toggle, noSlider, maxOverride)
 	local row = Instance.new("Frame", parent)
@@ -643,14 +679,13 @@ createRow(page1, "NOCLIP", 185,
 	true
 )
 
--- ================= PAGE 2 (ESP & FREECAM) =================
+-- ================= PAGE 2 ROWS =================
 createRow(page2, "ESP", 5,
 	function() return 0 end,
 	function() end,
 	function(s) espEnabled = s if s then startESP() else stopESP() end end,
 	true
 )
--- FREECAM slider max = 5
 createRow(page2, "FREECAM", 65,
 	function() return freecamSpeed end,
 	function(v) freecamSpeed = v end,
@@ -723,6 +758,17 @@ tpMainBtn.MouseButton1Click:Connect(function()
 	if tpList.Visible then updateTPList() end
 end)
 
+-- ================= PAGE 3 ROWS =================
+createRow(page3, "NIGHT VISION", 5,
+	function() return 0 end,
+	function() end,
+	function(s)
+		nightVisionEnabled = s
+		if s then startNightVision() else stopNightVision() end
+	end,
+	true
+)
+
 -- ================= CHARACTER RELOAD =================
 player.CharacterAdded:Connect(function()
 	humanoid = getHumanoid()
@@ -730,4 +776,8 @@ player.CharacterAdded:Connect(function()
 	if speedEnabled then humanoid.WalkSpeed = walkSpeed end
 	if jumpEnabled then humanoid.JumpPower = jumpPower end
 	if noclipEnabled then startNoclip() end
+	if nightVisionEnabled then
+		task.wait(1)
+		startNightVision()
+	end
 end)
