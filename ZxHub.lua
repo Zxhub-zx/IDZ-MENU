@@ -39,13 +39,13 @@ end
 local humanoid = getHumanoid()
 
 pcall(function()
-	if player.PlayerGui:FindFirstChild("ZxHubGUI") then
-		player.PlayerGui.ZxHubGUI:Destroy()
+	if player.PlayerGui:FindFirstChild("GUI") then
+		player.PlayerGui.GUI:Destroy()
 	end
 end)
 
 local gui = Instance.new("ScreenGui")
-gui.Name = "ZxHubGUI"
+gui.Name = "GUI"
 gui.Parent = player:WaitForChild("PlayerGui")
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
@@ -72,21 +72,12 @@ Instance.new("UICorner", topBar).CornerRadius = UDim.new(0,14)
 local title = Instance.new("TextLabel", topBar)
 title.Size = UDim2.new(1,0,1,0)
 title.BackgroundTransparency = 1
-title.Text = "ZxHub"
+title.Text = ""
 title.TextColor3 = Color3.fromRGB(0,255,120)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 22
 title.TextXAlignment = Enum.TextXAlignment.Center
 
-local credit = Instance.new("TextLabel", topBar)
-credit.Size = UDim2.new(0, 200, 1, 0)
-credit.Position = UDim2.new(0, 10, 0, 0)
-credit.BackgroundTransparency = 1
-credit.Text = "by : YouTube ZXzn9"
-credit.TextColor3 = Color3.fromRGB(0,255,120)
-credit.Font = Enum.Font.GothamBold
-credit.TextSize = 14
-credit.TextXAlignment = Enum.TextXAlignment.Left
 
 local minBtn = Instance.new("TextButton", frame)
 minBtn.Size = UDim2.new(0,30,0,30)
