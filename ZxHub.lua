@@ -13,6 +13,7 @@ local noclipEnabled = false
 local espEnabled = false
 local freecamEnabled = false
 local nightVisionEnabled = false
+local clickTPEnabled = false
 local flySpeed = 8
 local walkSpeed = 16
 local jumpPower = 50
@@ -41,6 +42,7 @@ gui.Parent = player:WaitForChild("PlayerGui")
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
 -- ================= MAIN WINDOW (Glassmorphism) =================
 local frame = Instance.new("Frame", gui)
 frame.Size = UDim2.new(0, 520, 0, 360)
@@ -74,6 +76,7 @@ frameShadow.SliceCenter = Rect.new(49, 49, 450, 450)
 frameShadow.Size = UDim2.new(1, 40, 1, 40)
 frameShadow.Position = UDim2.new(0, -20, 0, -16)
 frameShadow.ZIndex = 0
+
 -- ================= TOP BAR =================
 local topBar = Instance.new("Frame", frame)
 topBar.Size = UDim2.new(1, 0, 0, 42)
@@ -98,7 +101,8 @@ title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.TextTransparency = 0.05
--- ================= MINIMIZE BAR (top-center, always visible, draggable) =================
+
+-- ================= MINIMIZE BAR =================
 local minBar = Instance.new("TextButton", gui)
 minBar.Name = "MinimizeBar"
 minBar.Size = UDim2.new(0, 180, 0, 32)
@@ -129,9 +133,7 @@ minBarLabel.Font = Enum.Font.GothamBold
 minBarLabel.TextSize = 13
 minBarLabel.ZIndex = 51
 local isMinimized = false
-local frameOpenPos = frame.Position
 local frameOpenSize = frame.Size
-local tweenInfoFast = TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 local tweenInfoSoft = TweenInfo.new(0.32, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 local function setMinimized(state)
 	isMinimized = state
@@ -182,7 +184,6 @@ end
 minBar.MouseButton1Click:Connect(function()
 	setMinimized(not isMinimized)
 end)
--- Hover effect for minBar
 minBar.MouseEnter:Connect(function()
 	TweenService:Create(minBar, TweenInfo.new(0.15), {BackgroundTransparency = 0.05}):Play()
 	TweenService:Create(minBarStroke, TweenInfo.new(0.15), {Transparency = 0.15}):Play()
@@ -191,7 +192,6 @@ minBar.MouseLeave:Connect(function()
 	TweenService:Create(minBar, TweenInfo.new(0.15), {BackgroundTransparency = 0.15}):Play()
 	TweenService:Create(minBarStroke, TweenInfo.new(0.15), {Transparency = 0.4}):Play()
 end)
--- Drag for minimize bar
 do
 	local drag = false
 	local start, pos
@@ -212,7 +212,8 @@ do
 		drag = false
 	end)
 end
--- ================= TAB BUTTONS =================
+
+-- ================= TAB BUTTONS (2 tabs only) =================
 local tabContainer = Instance.new("Frame", frame)
 tabContainer.Size = UDim2.new(1, -24, 0, 34)
 tabContainer.Position = UDim2.new(0, 12, 0, 48)
@@ -229,9 +230,9 @@ local function styleTab(btn, active)
 	end
 end
 local tab1Btn = Instance.new("TextButton", tabContainer)
-tab1Btn.Size = UDim2.new(0, 110, 0, 30)
+tab1Btn.Size = UDim2.new(0, 150, 0, 30)
 tab1Btn.Position = UDim2.new(0, 0, 0, 2)
-tab1Btn.Text = "หน้า 1"
+tab1Btn.Text = "ผู้เล่น"
 tab1Btn.Font = Enum.Font.GothamBold
 tab1Btn.TextSize = 13
 tab1Btn.AutoButtonColor = false
@@ -242,9 +243,9 @@ tab1Stroke.Color = Color3.fromRGB(0, 220, 130)
 tab1Stroke.Transparency = 0.7
 styleTab(tab1Btn, true)
 local tab2Btn = Instance.new("TextButton", tabContainer)
-tab2Btn.Size = UDim2.new(0, 110, 0, 30)
-tab2Btn.Position = UDim2.new(0, 118, 0, 2)
-tab2Btn.Text = "หน้า 2"
+tab2Btn.Size = UDim2.new(0, 150, 0, 30)
+tab2Btn.Position = UDim2.new(0, 160, 0, 2)
+tab2Btn.Text = "เครื่องมือ"
 tab2Btn.Font = Enum.Font.GothamBold
 tab2Btn.TextSize = 13
 tab2Btn.AutoButtonColor = false
@@ -254,19 +255,6 @@ tab2Stroke.Thickness = 1
 tab2Stroke.Color = Color3.fromRGB(0, 220, 130)
 tab2Stroke.Transparency = 0.85
 styleTab(tab2Btn, false)
-local tab3Btn = Instance.new("TextButton", tabContainer)
-tab3Btn.Size = UDim2.new(0, 110, 0, 30)
-tab3Btn.Position = UDim2.new(0, 236, 0, 2)
-tab3Btn.Text = "หน้า 3"
-tab3Btn.Font = Enum.Font.GothamBold
-tab3Btn.TextSize = 13
-tab3Btn.AutoButtonColor = false
-Instance.new("UICorner", tab3Btn).CornerRadius = UDim.new(0, 9)
-local tab3Stroke = Instance.new("UIStroke", tab3Btn)
-tab3Stroke.Thickness = 1
-tab3Stroke.Color = Color3.fromRGB(0, 220, 130)
-tab3Stroke.Transparency = 0.85
-styleTab(tab3Btn, false)
 local function addTabHover(btn, stroke)
 	btn.MouseEnter:Connect(function()
 		TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundTransparency = 0.08}):Play()
@@ -280,8 +268,8 @@ local function addTabHover(btn, stroke)
 end
 addTabHover(tab1Btn, tab1Stroke)
 addTabHover(tab2Btn, tab2Stroke)
-addTabHover(tab3Btn, tab3Stroke)
--- ================= PAGE CONTAINERS =================
+
+-- ================= PAGE CONTAINERS (only 2) =================
 local page1 = Instance.new("ScrollingFrame", frame)
 page1.Size = UDim2.new(1, -8, 1, -92)
 page1.Position = UDim2.new(0, 4, 0, 88)
@@ -290,13 +278,14 @@ page1.Visible = true
 page1.ScrollBarThickness = 3
 page1.ScrollBarImageColor3 = Color3.fromRGB(0, 200, 120)
 page1.ScrollBarImageTransparency = 0.4
-page1.CanvasSize = UDim2.new(0, 0, 0, 450)
+page1.CanvasSize = UDim2.new(0, 0, 0, 520)
 page1.BorderSizePixel = 0
 local page1Pad = Instance.new("UIPadding", page1)
 page1Pad.PaddingTop = UDim.new(0, 6)
 page1Pad.PaddingBottom = UDim.new(0, 12)
 page1Pad.PaddingLeft = UDim.new(0, 6)
 page1Pad.PaddingRight = UDim.new(0, 6)
+
 local page2 = Instance.new("ScrollingFrame", frame)
 page2.Size = UDim2.new(1, -8, 1, -92)
 page2.Position = UDim2.new(0, 4, 0, 88)
@@ -305,73 +294,37 @@ page2.Visible = false
 page2.ScrollBarThickness = 3
 page2.ScrollBarImageColor3 = Color3.fromRGB(0, 200, 120)
 page2.ScrollBarImageTransparency = 0.4
-page2.CanvasSize = UDim2.new(0, 0, 0, 600)
+page2.CanvasSize = UDim2.new(0, 0, 0, 520)
 page2.BorderSizePixel = 0
 local page2Pad = Instance.new("UIPadding", page2)
 page2Pad.PaddingTop = UDim.new(0, 6)
 page2Pad.PaddingBottom = UDim.new(0, 12)
 page2Pad.PaddingLeft = UDim.new(0, 6)
 page2Pad.PaddingRight = UDim.new(0, 6)
-local page3 = Instance.new("ScrollingFrame", frame)
-page3.Size = UDim2.new(1, -8, 1, -92)
-page3.Position = UDim2.new(0, 4, 0, 88)
-page3.BackgroundTransparency = 1
-page3.Visible = false
-page3.ScrollBarThickness = 3
-page3.ScrollBarImageColor3 = Color3.fromRGB(0, 200, 120)
-page3.ScrollBarImageTransparency = 0.4
-page3.CanvasSize = UDim2.new(0, 0, 0, 600)
-page3.BorderSizePixel = 0
-local page3Pad = Instance.new("UIPadding", page3)
-page3Pad.PaddingTop = UDim.new(0, 6)
-page3Pad.PaddingBottom = UDim.new(0, 12)
-page3Pad.PaddingLeft = UDim.new(0, 6)
-page3Pad.PaddingRight = UDim.new(0, 6)
+
 local function switchTab(pg)
-	local function fadePage(p, show)
-		if show then
-			p.Visible = true
-			p.CanvasPosition = Vector2.new(0, 0)
-		else
-			p.Visible = false
-		end
-	end
 	if pg == 1 then
-		fadePage(page1, true)
-		fadePage(page2, false)
-		fadePage(page3, false)
+		page1.Visible = true
+		page2.Visible = false
+		page1.CanvasPosition = Vector2.new(0, 0)
 		styleTab(tab1Btn, true)
 		styleTab(tab2Btn, false)
-		styleTab(tab3Btn, false)
 		tab1Stroke.Transparency = 0.55
 		tab2Stroke.Transparency = 0.85
-		tab3Stroke.Transparency = 0.85
-	elseif pg == 2 then
-		fadePage(page1, false)
-		fadePage(page2, true)
-		fadePage(page3, false)
+	else
+		page1.Visible = false
+		page2.Visible = true
+		page2.CanvasPosition = Vector2.new(0, 0)
 		styleTab(tab1Btn, false)
 		styleTab(tab2Btn, true)
-		styleTab(tab3Btn, false)
 		tab1Stroke.Transparency = 0.85
 		tab2Stroke.Transparency = 0.55
-		tab3Stroke.Transparency = 0.85
-	else
-		fadePage(page1, false)
-		fadePage(page2, false)
-		fadePage(page3, true)
-		styleTab(tab1Btn, false)
-		styleTab(tab2Btn, false)
-		styleTab(tab3Btn, true)
-		tab1Stroke.Transparency = 0.85
-		tab2Stroke.Transparency = 0.85
-		tab3Stroke.Transparency = 0.55
 	end
 end
 tab1Btn.MouseButton1Click:Connect(function() switchTab(1) end)
 tab2Btn.MouseButton1Click:Connect(function() switchTab(2) end)
-tab3Btn.MouseButton1Click:Connect(function() switchTab(3) end)
--- ================= MOBILE CONTROLS (redesigned rounded rect) =================
+
+-- ================= MOBILE CONTROLS =================
 local function styleMobileBtn(btn)
 	btn.BackgroundColor3 = Color3.fromRGB(22, 24, 28)
 	btn.BackgroundTransparency = 0.12
@@ -483,6 +436,7 @@ local function dragify(target, handle)
 	UIS.InputEnded:Connect(function() drag = false end)
 end
 dragify(frame, topBar)
+
 -- Opening animation
 frame.BackgroundTransparency = 1
 frame.Size = UDim2.new(0, 520, 0, 0)
@@ -493,6 +447,7 @@ task.defer(function()
 	})
 	openTween:Play()
 end)
+
 -- ================= FREECAM =================
 local freecamPart
 local freecamConn
@@ -542,6 +497,7 @@ local function stopFreecam()
 	downBtn.Visible = false
 	setMoveButtonsVisible(false)
 end
+
 -- ================= FLY =================
 local flyConn
 local flyBV, flyBG
@@ -587,6 +543,7 @@ local function stopFly()
 	downBtn.Visible = false
 	pcall(function() getChar():WaitForChild("Humanoid").PlatformStand = false end)
 end
+
 -- ================= NOCLIP =================
 local noclipConn
 local function startNoclip()
@@ -609,10 +566,10 @@ local function stopNoclip()
 		end
 	end
 end
--- ================= ESP (Real-time + proper cleanup) =================
+
+-- ================= ESP (Real-time) =================
 local espObjects = {}
 local espConnections = {}
-
 local function clearESPFor(target)
 	if espObjects[target] then
 		for _, obj in ipairs(espObjects[target]) do
@@ -627,17 +584,14 @@ local function clearESPFor(target)
 		espConnections[target] = nil
 	end
 end
-
 local function addESP(target)
 	if target == player then return end
 	clearESPFor(target)
-
 	local function createVisuals(char)
 		if not char or not espEnabled then return end
 		local root = char:FindFirstChild("HumanoidRootPart") or char:WaitForChild("HumanoidRootPart", 3)
 		if not root then return end
 		local hum = char:FindFirstChildOfClass("Humanoid")
-
 		local hl = Instance.new("Highlight")
 		hl.Adornee = char
 		hl.FillColor = Color3.fromRGB(255, 255, 255)
@@ -646,14 +600,12 @@ local function addESP(target)
 		hl.OutlineTransparency = 0
 		hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 		hl.Parent = gui
-
 		local bb = Instance.new("BillboardGui")
 		bb.Adornee = root
 		bb.Size = UDim2.new(0, 120, 0, 28)
 		bb.StudsOffset = Vector3.new(0, 3.2, 0)
 		bb.AlwaysOnTop = true
 		bb.Parent = gui
-
 		local nameLabel = Instance.new("TextLabel", bb)
 		nameLabel.Size = UDim2.new(1, 0, 1, 0)
 		nameLabel.BackgroundTransparency = 1
@@ -663,9 +615,7 @@ local function addESP(target)
 		nameLabel.TextSize = 14
 		nameLabel.TextStrokeTransparency = 0.3
 		nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-
 		espObjects[target] = {hl, bb}
-
 		local conns = {}
 		if hum then
 			table.insert(conns, hum.Died:Connect(function()
@@ -679,11 +629,9 @@ local function addESP(target)
 		end))
 		espConnections[target] = conns
 	end
-
 	if target.Character then
 		createVisuals(target.Character)
 	end
-
 	local charConn = target.CharacterAdded:Connect(function(char)
 		task.wait(0.35)
 		if espEnabled then
@@ -693,18 +641,12 @@ local function addESP(target)
 	local remConn = target.CharacterRemoving:Connect(function()
 		clearESPFor(target)
 	end)
-
 	if not espConnections[target] then
 		espConnections[target] = {}
 	end
 	table.insert(espConnections[target], charConn)
 	table.insert(espConnections[target], remConn)
 end
-
-local function removeESP(target)
-	clearESPFor(target)
-end
-
 local playerAddedConn
 local function startESP()
 	for _, p in ipairs(game.Players:GetPlayers()) do
@@ -720,7 +662,6 @@ local function startESP()
 		clearESPFor(p)
 	end)
 end
-
 local function stopESP()
 	for _, p in ipairs(game.Players:GetPlayers()) do
 		clearESPFor(p)
@@ -731,14 +672,12 @@ local function stopESP()
 	end
 end
 
--- ================= NIGHT VISION (true full visibility) =================
+-- ================= NIGHT VISION =================
 local nightVisionLight
 local nightVisionConn
 local savedLighting = {}
-
 local function startNightVision()
 	local Lighting = game:GetService("Lighting")
-	-- Save current values
 	savedLighting.Ambient = Lighting.Ambient
 	savedLighting.OutdoorAmbient = Lighting.OutdoorAmbient
 	savedLighting.Brightness = Lighting.Brightness
@@ -746,7 +685,6 @@ local function startNightVision()
 	savedLighting.FogStart = Lighting.FogStart
 	savedLighting.ClockTime = Lighting.ClockTime
 	savedLighting.GlobalShadows = Lighting.GlobalShadows
-
 	local function forceBright()
 		Lighting.Ambient = Color3.fromRGB(255, 255, 255)
 		Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
@@ -756,11 +694,8 @@ local function startNightVision()
 		Lighting.GlobalShadows = false
 	end
 	forceBright()
-
-	-- Keep forcing every frame so other scripts can't override
 	if nightVisionConn then nightVisionConn:Disconnect() end
 	nightVisionConn = RunService.RenderStepped:Connect(forceBright)
-
 	local function attachLight(char)
 		if nightVisionLight then
 			pcall(function() nightVisionLight:Destroy() end)
@@ -778,7 +713,6 @@ local function startNightVision()
 	end
 	attachLight(getChar())
 end
-
 local function stopNightVision()
 	if nightVisionConn then
 		nightVisionConn:Disconnect()
@@ -799,7 +733,88 @@ local function stopNightVision()
 	savedLighting = {}
 end
 
--- ================= CREATE ROW (modern cards + sliding switch + improved slider) =================
+-- ================= CLICK TP (Mobile + PC friendly) =================
+local clickTPTool = nil
+local clickTPConn = nil
+local function doClickTeleport(hitPos)
+	if not hitPos then return end
+	local char = getChar()
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+	if root then
+		root.CFrame = CFrame.new(hitPos + Vector3.new(0, 3, 0))
+	end
+end
+local function startClickTP()
+	if clickTPTool then
+		pcall(function() clickTPTool:Destroy() end)
+		clickTPTool = nil
+	end
+	clickTPTool = Instance.new("Tool")
+	clickTPTool.Name = "Click TP"
+	clickTPTool.RequiresHandle = false
+	clickTPTool.CanBeDropped = false
+	clickTPTool.ToolTip = "คลิก/แตะเพื่อวาป"
+	clickTPTool.Parent = player.Backpack
+
+	-- PC + Mobile: Tool.Activated works on both (tap on mobile)
+	clickTPTool.Activated:Connect(function()
+		local mouse = player:GetMouse()
+		if mouse and mouse.Hit then
+			doClickTeleport(mouse.Hit.Position)
+		end
+	end)
+
+	-- Extra mobile support via raycast from camera (more reliable on some devices)
+	if clickTPConn then clickTPConn:Disconnect() end
+	clickTPConn = UIS.InputBegan:Connect(function(input, processed)
+		if processed then return end
+		if not clickTPEnabled then return end
+		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+			-- only if tool is currently equipped
+			local char = player.Character
+			if not char then return end
+			local equipped = char:FindFirstChildOfClass("Tool")
+			if equipped ~= clickTPTool then return end
+
+			local cam = workspace.CurrentCamera
+			if not cam then return end
+			local unitRay = cam:ViewportPointToRay(input.Position.X, input.Position.Y)
+			local rayParams = RaycastParams.new()
+			rayParams.FilterDescendantsInstances = {char}
+			rayParams.FilterType = Enum.RaycastFilterType.Exclude
+			local result = workspace:Raycast(unitRay.Origin, unitRay.Direction * 1000, rayParams)
+			if result then
+				doClickTeleport(result.Position)
+			end
+		end
+	end)
+
+	-- Auto equip
+	task.defer(function()
+		local hum = getHumanoid()
+		if hum and clickTPTool then
+			hum:EquipTool(clickTPTool)
+		end
+	end)
+end
+local function stopClickTP()
+	if clickTPConn then
+		clickTPConn:Disconnect()
+		clickTPConn = nil
+	end
+	if clickTPTool then
+		pcall(function()
+			local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+			if hum then
+				hum:UnequipTools()
+			end
+			clickTPTool:Destroy()
+		end)
+		clickTPTool = nil
+	end
+end
+
+-- ================= CREATE ROW =================
 local function createRow(parent, name, yPos, getVal, setVal, toggle, noSlider, maxOverride)
 	local row = Instance.new("Frame", parent)
 	row.Size = UDim2.new(1, -12, 0, 58)
@@ -820,7 +835,7 @@ local function createRow(parent, name, yPos, getVal, setVal, toggle, noSlider, m
 	})
 	rowGrad.Rotation = 110
 	local label = Instance.new("TextLabel", row)
-	label.Size = UDim2.new(0, 110, 1, 0)
+	label.Size = UDim2.new(0, 130, 1, 0)
 	label.Position = UDim2.new(0, 14, 0, 0)
 	label.BackgroundTransparency = 1
 	label.Text = name
@@ -828,7 +843,7 @@ local function createRow(parent, name, yPos, getVal, setVal, toggle, noSlider, m
 	label.Font = Enum.Font.GothamBold
 	label.TextSize = 14
 	label.TextXAlignment = Enum.TextXAlignment.Left
-	-- Modern sliding switch
+	-- Sliding switch
 	local switchTrack = Instance.new("Frame", row)
 	switchTrack.Size = UDim2.new(0, 46, 0, 24)
 	switchTrack.Position = UDim2.new(1, -60, 0.5, -12)
@@ -871,7 +886,7 @@ local function createRow(parent, name, yPos, getVal, setVal, toggle, noSlider, m
 		local maxVal = maxOverride or 500
 		local sliderBg = Instance.new("Frame", row)
 		sliderBg.Size = UDim2.new(0, 148, 0, 8)
-		sliderBg.Position = UDim2.new(0, 128, 0.5, -4)
+		sliderBg.Position = UDim2.new(0, 148, 0.5, -4)
 		sliderBg.BackgroundColor3 = Color3.fromRGB(45, 48, 54)
 		sliderBg.BorderSizePixel = 0
 		Instance.new("UICorner", sliderBg).CornerRadius = UDim.new(1, 0)
@@ -893,7 +908,7 @@ local function createRow(parent, name, yPos, getVal, setVal, toggle, noSlider, m
 		thumbStroke.Transparency = 0.3
 		local valBox = Instance.new("TextBox", row)
 		valBox.Size = UDim2.new(0, 44, 0, 24)
-		valBox.Position = UDim2.new(0, 286, 0.5, -12)
+		valBox.Position = UDim2.new(0, 306, 0.5, -12)
 		valBox.BackgroundColor3 = Color3.fromRGB(35, 38, 44)
 		valBox.BackgroundTransparency = 0.15
 		valBox.TextColor3 = Color3.fromRGB(0, 255, 140)
@@ -944,7 +959,8 @@ local function createRow(parent, name, yPos, getVal, setVal, toggle, noSlider, m
 		end)
 	end
 end
--- ================= PAGE 1 ROWS =================
+
+-- ================= PAGE 1 : ผู้เล่น =================
 createRow(page1, "FLY", 5,
 	function() return flySpeed end,
 	function(v) flySpeed = v end,
@@ -966,7 +982,26 @@ createRow(page1, "NOCLIP", 206,
 	function(s) noclipEnabled = s if s then startNoclip() else stopNoclip() end end,
 	true
 )
--- ================= PAGE 2 ROWS =================
+createRow(page1, "NIGHT VISION", 273,
+	function() return 0 end,
+	function() end,
+	function(s)
+		nightVisionEnabled = s
+		if s then startNightVision() else stopNightVision() end
+	end,
+	true
+)
+createRow(page1, "CLICK TP", 340,
+	function() return 0 end,
+	function() end,
+	function(s)
+		clickTPEnabled = s
+		if s then startClickTP() else stopClickTP() end
+	end,
+	true
+)
+
+-- ================= PAGE 2 : เครื่องมือ =================
 createRow(page2, "ESP", 5,
 	function() return 0 end,
 	function() end,
@@ -980,7 +1015,8 @@ createRow(page2, "FREECAM", 72,
 	false,
 	5
 )
--- ================= TELEPORT SYSTEM =================
+
+-- TELEPORT SYSTEM (Player list)
 local tpRow = Instance.new("Frame", page2)
 tpRow.Size = UDim2.new(1, -12, 0, 52)
 tpRow.Position = UDim2.new(0, 6, 0, 139)
@@ -1006,6 +1042,7 @@ tpLabel.TextColor3 = Color3.fromRGB(235, 240, 245)
 tpLabel.Font = Enum.Font.GothamBold
 tpLabel.TextSize = 14
 tpLabel.TextXAlignment = Enum.TextXAlignment.Left
+
 local tpList = Instance.new("Frame", page2)
 tpList.Size = UDim2.new(1, -12, 0, 200)
 tpList.Position = UDim2.new(0, 6, 0, 200)
@@ -1072,16 +1109,7 @@ tpMainBtn.MouseButton1Click:Connect(function()
 	tpList.Visible = not tpList.Visible
 	if tpList.Visible then updateTPList() end
 end)
--- ================= PAGE 3 ROWS =================
-createRow(page3, "NIGHT VISION", 5,
-	function() return 0 end,
-	function() end,
-	function(s)
-		nightVisionEnabled = s
-		if s then startNightVision() else stopNightVision() end
-	end,
-	true
-)
+
 -- ================= CHARACTER RELOAD =================
 player.CharacterAdded:Connect(function()
 	humanoid = getHumanoid()
@@ -1092,5 +1120,9 @@ player.CharacterAdded:Connect(function()
 	if nightVisionEnabled then
 		task.wait(0.8)
 		startNightVision()
+	end
+	if clickTPEnabled then
+		task.wait(0.6)
+		startClickTP()
 	end
 end)
