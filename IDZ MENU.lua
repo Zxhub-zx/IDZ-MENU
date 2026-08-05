@@ -19,6 +19,8 @@ local nightVisionEnabled = false
 local clickTPEnabled = false
 local fpsBoostEnabled = false
 local aimbotEnabled = false
+local infiniteJumpEnabled = false
+
 local aimbotTargetType = "player"
 local aimbotRangeMode = "close"
 local aimbotCloseRange = 60
@@ -37,12 +39,13 @@ local moveRight = false
 local currentLang = "th"
 local L = {
 	th = {
-		player = "ผู้เล่น",
+		player = "หน้าหลัก",
 		tools = "เครื่องมือ",
 		settings = "ตั้งค่า",
 		fly = "บิน",
 		speed = "ความเร็ว",
 		jump = "กระโดด",
+		infjump = "Infinite Jump",
 		noclip = "ทะลุของ",
 		night = "มองกลางคืน",
 		esp = "ESP",
@@ -62,12 +65,13 @@ local L = {
 		off = "off"
 	},
 	en = {
-		player = "Player",
+		player = "Main",
 		tools = "Tools",
 		settings = "Settings",
 		fly = "Fly",
 		speed = "Speed",
 		jump = "Jump",
+		infjump = "Infinite Jump",
 		noclip = "Noclip",
 		night = "Night Vision",
 		esp = "ESP",
@@ -112,7 +116,6 @@ gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- ================= FIXED SIZE =================
 local uiW, uiH = 520, 420
 
 local frame = Instance.new("Frame", gui)
@@ -141,7 +144,6 @@ shadow.Size = UDim2.new(1, 36, 1, 36)
 shadow.Position = UDim2.new(0, -18, 0, -16)
 shadow.ZIndex = 0
 
--- ================= TITLE BAR =================
 local titleBar = Instance.new("Frame", frame)
 titleBar.Size = UDim2.new(1, 0, 0, 42)
 titleBar.BackgroundColor3 = Color3.fromRGB(22, 22, 34)
@@ -196,7 +198,6 @@ closeBtn.MouseLeave:Connect(function()
 	TweenService:Create(closeBtn, TweenInfo.new(0.12), {BackgroundTransparency = 0.4, BackgroundColor3 = Color3.fromRGB(40, 40, 55)}):Play()
 end)
 
--- ================= SIDEBAR =================
 local sideW = 130
 local sidebar = Instance.new("Frame", frame)
 sidebar.Size = UDim2.new(0, sideW, 1, -42)
@@ -236,7 +237,7 @@ local function createSidebarBtn(text, icon, y)
 	return btn, iconLbl, txt
 end
 
-local tab1Btn, tab1Icon, tab1Text = createSidebarBtn(T("player"), "👤", 10)
+local tab1Btn, tab1Icon, tab1Text = createSidebarBtn(T("player"), "🏠", 10)
 local tab2Btn, tab2Icon, tab2Text = createSidebarBtn(T("tools"), "🛠", 54)
 local tab3Btn, tab3Icon, tab3Text = createSidebarBtn(T("settings"), "⚙", 98)
 
@@ -259,7 +260,6 @@ local function setActiveTab(active)
 end
 setActiveTab(1)
 
--- ================= CONTENT =================
 local content = Instance.new("Frame", frame)
 content.Size = UDim2.new(1, -(sideW + 8), 1, -42)
 content.Position = UDim2.new(0, sideW + 6, 0, 42)
@@ -273,7 +273,7 @@ page1.Visible = true
 page1.ScrollBarThickness = 3
 page1.ScrollBarImageColor3 = Color3.fromRGB(140, 100, 255)
 page1.ScrollBarImageTransparency = 0.4
-page1.CanvasSize = UDim2.new(0, 0, 0, 360)
+page1.CanvasSize = UDim2.new(0, 0, 0, 420)
 page1.BorderSizePixel = 0
 Instance.new("UIPadding", page1).PaddingTop = UDim.new(0, 8)
 
@@ -303,7 +303,6 @@ tab1Btn.MouseButton1Click:Connect(function() switchTab(1) end)
 tab2Btn.MouseButton1Click:Connect(function() switchTab(2) end)
 tab3Btn.MouseButton1Click:Connect(function() switchTab(3) end)
 
--- ================= MINIMIZE =================
 local isMinimized = false
 local frameOpenSize = frame.Size
 
@@ -403,7 +402,6 @@ task.defer(function()
 	}):Play()
 end)
 
--- ================= MOBILE =================
 local function styleMobile(btn)
 	btn.BackgroundColor3 = Color3.fromRGB(28, 26, 42)
 	btn.BackgroundTransparency = 0.15
@@ -478,7 +476,7 @@ bind(moveBackBtn, "back")
 bind(moveLeftBtn, "left")
 bind(moveRightBtn, "right")
 
--- ================= FEATURES (เดิม) =================
+-- ================= FEATURES =================
 local freecamPart, freecamConn
 local function setMoveButtonsVisible(v)
 	moveForwardBtn.Visible = v
@@ -585,6 +583,25 @@ local function stopNoclip()
 		for _, p in ipairs(char:GetDescendants()) do
 			if p:IsA("BasePart") then p.CanCollide = true end
 		end
+	end
+end
+
+-- ================= INFINITE JUMP =================
+local infiniteJumpConn
+local function startInfiniteJump()
+	if infiniteJumpConn then infiniteJumpConn:Disconnect() end
+	infiniteJumpConn = UIS.JumpRequest:Connect(function()
+		if not infiniteJumpEnabled then return end
+		local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+		if hum then
+			hum:ChangeState(Enum.HumanoidStateType.Jumping)
+		end
+	end)
+end
+local function stopInfiniteJump()
+	if infiniteJumpConn then
+		infiniteJumpConn:Disconnect()
+		infiniteJumpConn = nil
 	end
 end
 
@@ -780,21 +797,19 @@ local function stopFPSBoost()
 	end)
 end
 
--- ================= AIMBOT + TEAM SYSTEM =================
+-- ================= AIMBOT + TEAM =================
 local aimbotConn
-local teamHighlights = {} -- [player] = Highlight
+local teamHighlights = {}
 
 local TEAM_COLORS = {
-	own = Color3.fromRGB(40, 120, 255),      -- น้ำเงิน (ทีมเรา)
-	enemy = Color3.fromRGB(220, 40, 40),     -- แดง (ศัตรู)
-	third = Color3.fromRGB(255, 180, 40),    -- ส้ม (ทีมที่ 3)
-	fourth = Color3.fromRGB(40, 220, 120),   -- เขียว
-	neutral = Color3.fromRGB(180, 180, 200)
+	own = Color3.fromRGB(40, 120, 255),
+	enemy = Color3.fromRGB(220, 40, 40),
+	third = Color3.fromRGB(255, 180, 40),
+	fourth = Color3.fromRGB(40, 220, 120),
 }
 
 local function getPlayerTeam(plr)
-	if plr.Team then return plr.Team end
-	return nil
+	return plr.Team
 end
 
 local function isEnemy(plr)
@@ -804,12 +819,10 @@ local function isEnemy(plr)
 	if myTeam and theirTeam then
 		return myTeam ~= theirTeam
 	end
-	-- ถ้าไม่มีทีม ถือว่าเป็นศัตรูได้ (โหมด FFA)
 	return true
 end
 
 local function detectRole(plr)
-	-- ตรวจบทบาทแบบง่าย (Murder Mystery / เกมที่มีบทบาท)
 	if not plr.Character then return "normal" end
 	local char = plr.Character
 	local tool = char:FindFirstChildOfClass("Tool")
@@ -822,7 +835,6 @@ local function detectRole(plr)
 			return "sheriff"
 		end
 	end
-	-- ตรวจจาก Attribute / Value ที่เกมนิยมใช้
 	local roleVal = plr:FindFirstChild("Role") or char:FindFirstChild("Role")
 	if roleVal and roleVal:IsA("StringValue") then
 		local r = string.lower(roleVal.Value)
@@ -836,18 +848,10 @@ local function getTeamColor(plr)
 	if plr == player then return TEAM_COLORS.own end
 	local myTeam = getPlayerTeam(player)
 	local theirTeam = getPlayerTeam(plr)
-	if not myTeam or not theirTeam then
-		return TEAM_COLORS.enemy
-	end
-	if myTeam == theirTeam then
-		return TEAM_COLORS.own
-	end
-	-- หลายทีม
+	if not myTeam or not theirTeam then return TEAM_COLORS.enemy end
+	if myTeam == theirTeam then return TEAM_COLORS.own end
 	local teamsList = Teams:GetTeams()
-	if #teamsList <= 2 then
-		return TEAM_COLORS.enemy
-	end
-	-- หา index ของทีม
+	if #teamsList <= 2 then return TEAM_COLORS.enemy end
 	local idx = 1
 	for i, t in ipairs(teamsList) do
 		if t == theirTeam then idx = i break end
@@ -858,7 +862,7 @@ local function getTeamColor(plr)
 end
 
 local function clearTeamHighlights()
-	for plr, hl in pairs(teamHighlights) do
+	for _, hl in pairs(teamHighlights) do
 		pcall(function() hl:Destroy() end)
 	end
 	teamHighlights = {}
@@ -896,7 +900,6 @@ local function getAimbotTargets()
 	if not myRoot then return {} end
 	local range = aimbotRangeMode == "close" and aimbotCloseRange or aimbotFarRange
 	local list = {}
-
 	if aimbotTargetType == "player" then
 		local myRole = detectRole(player)
 		for _, p in ipairs(game.Players:GetPlayers()) do
@@ -908,16 +911,14 @@ local function getAimbotTargets()
 					if dist <= range and isEnemy(p) then
 						local role = detectRole(p)
 						local priority = 1
-						-- ถ้าเราเป็นตำรวจ → ล็อกฆาตกรก่อน
 						if myRole == "sheriff" and role == "murderer" then
 							priority = 10
-						-- ถ้าเราเป็นฆาตกร → ล็อกคนทั่วไป / ตำรวจ
 						elseif myRole == "murderer" and role ~= "murderer" then
 							priority = 8
 						elseif role == "murderer" then
 							priority = 6
 						end
-						table.insert(list, {root = root, dist = dist, priority = priority, plr = p})
+						table.insert(list, {root = root, dist = dist, priority = priority})
 					end
 				end
 			end
@@ -938,7 +939,6 @@ local function getAimbotTargets()
 			end
 		end
 	end
-
 	table.sort(list, function(a, b)
 		if a.priority ~= b.priority then return a.priority > b.priority end
 		return a.dist < b.dist
@@ -951,7 +951,6 @@ local function startAimbot()
 	refreshAllTeamHighlights()
 	aimbotConn = RunService.RenderStepped:Connect(function()
 		if not aimbotEnabled then return end
-		-- อัปเดตไฮไลต์ทีม
 		for _, p in ipairs(game.Players:GetPlayers()) do
 			if p ~= player and p.Character then
 				updateTeamHighlight(p)
@@ -1024,14 +1023,9 @@ end
 apBtn.MouseButton1Click:Connect(function()
 	aimbotEnabled = not aimbotEnabled
 	updateAimbotPanelVisual(aimbotEnabled)
-	if aimbotEnabled then
-		startAimbot()
-	else
-		stopAimbot()
-	end
+	if aimbotEnabled then startAimbot() else stopAimbot() end
 end)
 
--- ลากแผง Aimbot ได้
 do
 	local drag, start, pos = false
 	aimbotPanel.InputBegan:Connect(function(i)
@@ -1052,9 +1046,7 @@ end
 
 local function showAimbotPanel(show)
 	aimbotPanel.Visible = show
-	if show then
-		updateAimbotPanelVisual(aimbotEnabled)
-	end
+	if show then updateAimbotPanelVisual(aimbotEnabled) end
 end
 
 -- ================= CREATE ROW =================
@@ -1171,20 +1163,59 @@ local function createRow(parent, key, y, getVal, setVal, toggle, noSlider, maxOv
 	end
 end
 
--- PAGE 1
-createRow(page1, "fly", 6, function() return flySpeed end, function(v) flySpeed = v end, function(s) flyEnabled = s if s then startFly() else stopFly() end end)
-createRow(page1, "speed", 58, function() return walkSpeed end, function(v) walkSpeed = v if speedEnabled then humanoid.WalkSpeed = v end end, function(s) speedEnabled = s humanoid.WalkSpeed = s and walkSpeed or 16 end)
-createRow(page1, "jump", 110, function() return jumpPower end, function(v) jumpPower = v if jumpEnabled then humanoid.JumpPower = v end end, function(s) jumpEnabled = s humanoid.JumpPower = s and jumpPower or 50 end)
-createRow(page1, "noclip", 162, function() return 0 end, function() end, function(s) noclipEnabled = s if s then startNoclip() else stopNoclip() end end, true)
-createRow(page1, "night", 214, function() return 0 end, function() end, function(s) nightVisionEnabled = s if s then startNightVision() else stopNightVision() end end, true)
+-- ================= PAGE 1 (หน้าหลัก) =================
+createRow(page1, "fly", 6,
+	function() return flySpeed end,
+	function(v) flySpeed = v end,
+	function(s) flyEnabled = s if s then startFly() else stopFly() end end
+)
+createRow(page1, "speed", 58,
+	function() return walkSpeed end,
+	function(v) walkSpeed = v if speedEnabled then humanoid.WalkSpeed = v end end,
+	function(s) speedEnabled = s humanoid.WalkSpeed = s and walkSpeed or 16 end
+)
+createRow(page1, "jump", 110,
+	function() return jumpPower end,
+	function(v) jumpPower = v if jumpEnabled then humanoid.JumpPower = v end end,
+	function(s) jumpEnabled = s humanoid.JumpPower = s and jumpPower or 50 end
+)
+createRow(page1, "infjump", 162,
+	function() return 0 end, function() end,
+	function(s)
+		infiniteJumpEnabled = s
+		if s then startInfiniteJump() else stopInfiniteJump() end
+	end,
+	true
+)
+createRow(page1, "noclip", 214,
+	function() return 0 end, function() end,
+	function(s) noclipEnabled = s if s then startNoclip() else stopNoclip() end end, true
+)
+createRow(page1, "night", 266,
+	function() return 0 end, function() end,
+	function(s) nightVisionEnabled = s if s then startNightVision() else stopNightVision() end end, true
+)
 
--- PAGE 2
-createRow(page2, "esp", 6, function() return 0 end, function() end, function(s) espEnabled = s if s then startESP() else stopESP() end end, true)
-createRow(page2, "freecam", 58, function() return freecamSpeed end, function(v) freecamSpeed = v end, function(s) freecamEnabled = s if s then startFreecam() else stopFreecam() end end, false, 5)
-createRow(page2, "clicktp", 110, function() return 0 end, function() end, function(s) clickTPEnabled = s if s then startClickTP() else stopClickTP() end end, true)
-createRow(page2, "fps", 162, function() return 0 end, function() end, function(s) fpsBoostEnabled = s if s then startFPSBoost() else stopFPSBoost() end end, true)
+-- ================= PAGE 2 =================
+createRow(page2, "esp", 6,
+	function() return 0 end, function() end,
+	function(s) espEnabled = s if s then startESP() else stopESP() end end, true
+)
+createRow(page2, "freecam", 58,
+	function() return freecamSpeed end,
+	function(v) freecamSpeed = v end,
+	function(s) freecamEnabled = s if s then startFreecam() else stopFreecam() end end, false, 5
+)
+createRow(page2, "clicktp", 110,
+	function() return 0 end, function() end,
+	function(s) clickTPEnabled = s if s then startClickTP() else stopClickTP() end end, true
+)
+createRow(page2, "fps", 162,
+	function() return 0 end, function() end,
+	function(s) fpsBoostEnabled = s if s then startFPSBoost() else stopFPSBoost() end end, true
+)
 
--- ================= AIMBOT (ในเมนู) =================
+-- AIMBOT section (เหมือนเดิม)
 local AIM_ROW_Y = 214
 local AIM_PANEL_HEIGHT = 148
 
@@ -1309,7 +1340,6 @@ farOpt.MouseButton1Click:Connect(function()
 end)
 updateRangeVisual()
 
--- ปุ่มเรียก UI แยก (แทน toggle เดิม)
 local callPanelBtn = Instance.new("TextButton", aimPanel)
 callPanelBtn.Size = UDim2.new(1, -20, 0, 32)
 callPanelBtn.Position = UDim2.new(0, 10, 0, 120)
@@ -1320,12 +1350,11 @@ callPanelBtn.Font = Enum.Font.GothamBold
 callPanelBtn.TextSize = 13
 callPanelBtn.AutoButtonColor = false
 Instance.new("UICorner", callPanelBtn).CornerRadius = UDim.new(0, 8)
-
 callPanelBtn.MouseButton1Click:Connect(function()
 	showAimbotPanel(not aimbotPanel.Visible)
 end)
 
--- ================= TELEPORT =================
+-- TELEPORT
 local tpRow = Instance.new("Frame", page2)
 tpRow.Size = UDim2.new(1, -16, 0, 42)
 tpRow.Position = UDim2.new(0, 8, 0, 268)
@@ -1491,9 +1520,9 @@ player.CharacterAdded:Connect(function()
 	if clickTPEnabled then task.wait(0.6) startClickTP() end
 	if fpsBoostEnabled then task.wait(0.3) startFPSBoost() end
 	if aimbotEnabled then task.wait(0.4) startAimbot() end
+	if infiniteJumpEnabled then task.wait(0.3) startInfiniteJump() end
 end)
 
--- เคลียร์ highlight เมื่อผู้เล่นออก
 game.Players.PlayerRemoving:Connect(function(p)
 	if teamHighlights[p] then
 		pcall(function() teamHighlights[p]:Destroy() end)
