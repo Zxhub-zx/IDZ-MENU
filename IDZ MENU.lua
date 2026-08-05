@@ -35,11 +35,6 @@ local moveBack = false
 local moveLeft = false
 local moveRight = false
 
--- Custom UI Size
-local customSizeEnabled = false
-local uiScale = 1.0          -- 0.7 ~ 1.3
-local BASE_W, BASE_H = 520, 420
-
 local currentLang = "th"
 local L = {
 	th = {
@@ -62,9 +57,7 @@ local L = {
 		targetNpc = "บอท",
 		rangeClose = "ใกล้",
 		rangeFar = "ไกล",
-		enableAimbot = "เปิด Aimbot",
-		customSize = "ปรับขนาดเอง",
-		uiScale = "ขนาด UI"
+		enableAimbot = "เปิด Aimbot"
 	},
 	en = {
 		player = "Player",
@@ -86,9 +79,7 @@ local L = {
 		targetNpc = "NPCs",
 		rangeClose = "Close",
 		rangeFar = "Far",
-		enableAimbot = "Enable Aimbot",
-		customSize = "Custom Size",
-		uiScale = "UI Scale"
+		enableAimbot = "Enable Aimbot"
 	}
 }
 local function T(key)
@@ -116,9 +107,24 @@ gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- ================= FIXED SIZE =================
-local uiW, uiH = BASE_W, BASE_H
+-- ================= RESPONSIVE SIZE =================
+local function getUISize()
+	local cam = workspace.CurrentCamera
+	local vs = (cam and cam.ViewportSize) or Vector2.new(1280, 720)
+	-- มือถือ / ไอแพด / คอม ปรับขนาดให้อยู่ในขอบเขตที่เหมาะสม
+	local w = math.clamp(math.floor(vs.X * 0.72), 300, 560)
+	local h = math.clamp(math.floor(vs.Y * 0.68), 340, 460)
+	-- ถ้าจอแคบมาก (มือถือแนวตั้ง) ให้แคบลงอีกนิด
+	if vs.X < 500 then
+		w = math.clamp(math.floor(vs.X * 0.92), 280, 400)
+		h = math.clamp(math.floor(vs.Y * 0.62), 320, 420)
+	end
+	return w, h
+end
 
+local uiW, uiH = getUISize()
+
+-- ================= MAIN WINDOW =================
 local frame = Instance.new("Frame", gui)
 frame.Size = UDim2.new(0, uiW, 0, uiH)
 frame.Position = UDim2.new(0.5, -uiW/2, 0.5, -uiH/2)
@@ -201,7 +207,7 @@ closeBtn.MouseLeave:Connect(function()
 end)
 
 -- ================= SIDEBAR =================
-local sideW = 130
+local sideW = math.clamp(math.floor(uiW * 0.26), 110, 140)
 local sidebar = Instance.new("Frame", frame)
 sidebar.Size = UDim2.new(0, sideW, 1, -42)
 sidebar.Position = UDim2.new(0, 0, 0, 42)
@@ -295,15 +301,10 @@ page2.CanvasSize = UDim2.new(0, 0, 0, 480)
 page2.BorderSizePixel = 0
 Instance.new("UIPadding", page2).PaddingTop = UDim.new(0, 8)
 
-local page3 = Instance.new("ScrollingFrame", content)
+local page3 = Instance.new("Frame", content)
 page3.Size = UDim2.new(1, 0, 1, -6)
 page3.BackgroundTransparency = 1
 page3.Visible = false
-page3.ScrollBarThickness = 3
-page3.ScrollBarImageColor3 = Color3.fromRGB(140, 100, 255)
-page3.CanvasSize = UDim2.new(0, 0, 0, 320)
-page3.BorderSizePixel = 0
-Instance.new("UIPadding", page3).PaddingTop = UDim.new(0, 8)
 
 local function switchTab(n)
 	page1.Visible = n == 1
@@ -314,17 +315,6 @@ end
 tab1Btn.MouseButton1Click:Connect(function() switchTab(1) end)
 tab2Btn.MouseButton1Click:Connect(function() switchTab(2) end)
 tab3Btn.MouseButton1Click:Connect(function() switchTab(3) end)
-
--- ================= APPLY SIZE =================
-local function applyUISize()
-	local w = math.floor(BASE_W * uiScale)
-	local h = math.floor(BASE_H * uiScale)
-	w = math.clamp(w, 320, 700)
-	h = math.clamp(h, 300, 560)
-	uiW, uiH = w, h
-	frame.Size = UDim2.new(0, w, 0, h)
-	frame.Position = UDim2.new(0.5, -w/2, 0.5, -h/2)
-end
 
 -- ================= MINIMIZE =================
 local isMinimized = false
@@ -355,7 +345,6 @@ minBarLabel.TextSize = 12
 local function setMinimized(state)
 	isMinimized = state
 	if state then
-		frameOpenSize = frame.Size
 		local t = TweenService:Create(frame, TweenInfo.new(0.25, Enum.EasingStyle.Quint), {
 			Size = UDim2.new(0, uiW, 0, 0),
 			BackgroundTransparency = 1
@@ -371,7 +360,7 @@ local function setMinimized(state)
 		frame.Size = UDim2.new(0, uiW, 0, 0)
 		frame.BackgroundTransparency = 1
 		TweenService:Create(frame, TweenInfo.new(0.25, Enum.EasingStyle.Quint), {
-			Size = UDim2.new(0, uiW, 0, uiH),
+			Size = frameOpenSize,
 			BackgroundTransparency = 0.05
 		}):Play()
 	end
@@ -418,6 +407,7 @@ local function dragify(target, handle)
 end
 dragify(frame, titleBar)
 
+-- Opening
 frame.BackgroundTransparency = 1
 frame.Size = UDim2.new(0, uiW, 0, 0)
 task.defer(function()
@@ -427,7 +417,7 @@ task.defer(function()
 	}):Play()
 end)
 
--- ================= MOBILE =================
+-- ================= MOBILE CONTROLS (ขนาดเล็กลงนิด) =================
 local function styleMobile(btn)
 	btn.BackgroundColor3 = Color3.fromRGB(28, 26, 42)
 	btn.BackgroundTransparency = 0.15
@@ -1273,15 +1263,18 @@ local function updateTPList()
 	listScroll.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 4)
 end
 
+-- ================= SMART LAYOUT =================
 local aimOpen = false
 local tpOpen = false
 
 local function refreshLayout()
 	local aimH = aimOpen and AIM_PANEL_HEIGHT or 0
 	local tpH = tpOpen and 140 or 0
+
 	TweenService:Create(aimPanel, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {
 		Size = UDim2.new(1, -16, 0, aimH)
 	}):Play()
+
 	local tpY = AIM_ROW_Y + 46 + aimH + 6
 	TweenService:Create(tpRow, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {
 		Position = UDim2.new(0, 8, 0, tpY)
@@ -1290,7 +1283,9 @@ local function refreshLayout()
 		Position = UDim2.new(0, 8, 0, tpY + 46),
 		Size = UDim2.new(1, -16, 0, tpH)
 	}):Play()
-	page2.CanvasSize = UDim2.new(0, 0, 0, math.max(tpY + 46 + tpH + 24, 360))
+
+	local totalH = tpY + 46 + tpH + 24
+	page2.CanvasSize = UDim2.new(0, 0, 0, math.max(totalH, 360))
 end
 
 local aimClick = Instance.new("TextButton", aimRow)
@@ -1313,12 +1308,13 @@ tpClick.MouseButton1Click:Connect(function()
 	if tpOpen then updateTPList() end
 	refreshLayout()
 end)
+
 refreshLayout()
 
--- ================= SETTINGS PAGE =================
+-- PAGE 3
 local langTitle = Instance.new("TextLabel", page3)
 langTitle.Size = UDim2.new(1, -16, 0, 26)
-langTitle.Position = UDim2.new(0, 12, 0, 10)
+langTitle.Position = UDim2.new(0, 12, 0, 16)
 langTitle.BackgroundTransparency = 1
 langTitle.Text = T("lang")
 langTitle.TextColor3 = Color3.fromRGB(170, 140, 255)
@@ -1327,8 +1323,8 @@ langTitle.TextSize = 14
 langTitle.TextXAlignment = Enum.TextXAlignment.Left
 
 local langBtn = Instance.new("TextButton", page3)
-langBtn.Size = UDim2.new(0, 160, 0, 34)
-langBtn.Position = UDim2.new(0, 12, 0, 40)
+langBtn.Size = UDim2.new(0, 160, 0, 36)
+langBtn.Position = UDim2.new(0, 12, 0, 50)
 langBtn.BackgroundColor3 = Color3.fromRGB(120, 80, 220)
 langBtn.Text = currentLang == "th" and "ไทย  →  English" or "English  →  ไทย"
 langBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1336,166 +1332,6 @@ langBtn.Font = Enum.Font.GothamBold
 langBtn.TextSize = 12
 langBtn.AutoButtonColor = false
 Instance.new("UICorner", langBtn).CornerRadius = UDim.new(0, 8)
-
--- Custom Size Section
-local sizeTitle = Instance.new("TextLabel", page3)
-sizeTitle.Size = UDim2.new(1, -16, 0, 26)
-sizeTitle.Position = UDim2.new(0, 12, 0, 90)
-sizeTitle.BackgroundTransparency = 1
-sizeTitle.Text = T("customSize")
-sizeTitle.TextColor3 = Color3.fromRGB(170, 140, 255)
-sizeTitle.Font = Enum.Font.GothamBold
-sizeTitle.TextSize = 14
-sizeTitle.TextXAlignment = Enum.TextXAlignment.Left
-table.insert(rowLabels, {label = sizeTitle, key = "customSize"})
-
-local sizeToggleRow = Instance.new("Frame", page3)
-sizeToggleRow.Size = UDim2.new(1, -16, 0, 40)
-sizeToggleRow.Position = UDim2.new(0, 8, 0, 120)
-sizeToggleRow.BackgroundColor3 = Color3.fromRGB(28, 28, 42)
-sizeToggleRow.BackgroundTransparency = 0.25
-Instance.new("UICorner", sizeToggleRow).CornerRadius = UDim.new(0, 9)
-
-local sizeToggleLabel = Instance.new("TextLabel", sizeToggleRow)
-sizeToggleLabel.Size = UDim2.new(0, 160, 1, 0)
-sizeToggleLabel.Position = UDim2.new(0, 12, 0, 0)
-sizeToggleLabel.BackgroundTransparency = 1
-sizeToggleLabel.Text = T("customSize")
-sizeToggleLabel.TextColor3 = Color3.fromRGB(210, 210, 230)
-sizeToggleLabel.Font = Enum.Font.GothamBold
-sizeToggleLabel.TextSize = 12
-sizeToggleLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-local sizeTrack = Instance.new("Frame", sizeToggleRow)
-sizeTrack.Size = UDim2.new(0, 40, 0, 20)
-sizeTrack.Position = UDim2.new(1, -50, 0.5, -10)
-sizeTrack.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-Instance.new("UICorner", sizeTrack).CornerRadius = UDim.new(1, 0)
-local sizeThumb = Instance.new("Frame", sizeTrack)
-sizeThumb.Size = UDim2.new(0, 16, 0, 16)
-sizeThumb.Position = UDim2.new(0, 2, 0.5, -8)
-sizeThumb.BackgroundColor3 = Color3.fromRGB(180, 180, 200)
-Instance.new("UICorner", sizeThumb).CornerRadius = UDim.new(1, 0)
-local sizeHit = Instance.new("TextButton", sizeTrack)
-sizeHit.Size = UDim2.new(1, 0, 1, 0)
-sizeHit.BackgroundTransparency = 1
-sizeHit.Text = ""
-sizeHit.ZIndex = 5
-
--- Scale slider (hidden until enabled)
-local scaleRow = Instance.new("Frame", page3)
-scaleRow.Size = UDim2.new(1, -16, 0, 50)
-scaleRow.Position = UDim2.new(0, 8, 0, 170)
-scaleRow.BackgroundColor3 = Color3.fromRGB(28, 28, 42)
-scaleRow.BackgroundTransparency = 0.25
-scaleRow.Visible = false
-Instance.new("UICorner", scaleRow).CornerRadius = UDim.new(0, 9)
-
-local scaleLabel = Instance.new("TextLabel", scaleRow)
-scaleLabel.Size = UDim2.new(0, 100, 1, 0)
-scaleLabel.Position = UDim2.new(0, 12, 0, 0)
-scaleLabel.BackgroundTransparency = 1
-scaleLabel.Text = T("uiScale")
-scaleLabel.TextColor3 = Color3.fromRGB(210, 210, 230)
-scaleLabel.Font = Enum.Font.GothamBold
-scaleLabel.TextSize = 12
-scaleLabel.TextXAlignment = Enum.TextXAlignment.Left
-table.insert(rowLabels, {label = scaleLabel, key = "uiScale"})
-
-local scaleBg = Instance.new("Frame", scaleRow)
-scaleBg.Size = UDim2.new(0, 160, 0, 6)
-scaleBg.Position = UDim2.new(0, 110, 0.5, -3)
-scaleBg.BackgroundColor3 = Color3.fromRGB(45, 45, 65)
-Instance.new("UICorner", scaleBg).CornerRadius = UDim.new(1, 0)
-local scaleFill = Instance.new("Frame", scaleBg)
-scaleFill.Size = UDim2.new(0.5, 0, 1, 0) -- default 1.0 → middle
-scaleFill.BackgroundColor3 = Color3.fromRGB(150, 110, 255)
-Instance.new("UICorner", scaleFill).CornerRadius = UDim.new(1, 0)
-local scaleThumb = Instance.new("Frame", scaleBg)
-scaleThumb.Size = UDim2.new(0, 14, 0, 14)
-scaleThumb.Position = UDim2.new(0.5, -7, 0.5, -7)
-scaleThumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-scaleThumb.ZIndex = 3
-Instance.new("UICorner", scaleThumb).CornerRadius = UDim.new(1, 0)
-
-local scaleValue = Instance.new("TextLabel", scaleRow)
-scaleValue.Size = UDim2.new(0, 50, 1, 0)
-scaleValue.Position = UDim2.new(1, -58, 0, 0)
-scaleValue.BackgroundTransparency = 1
-scaleValue.Text = "100%"
-scaleValue.TextColor3 = Color3.fromRGB(180, 150, 255)
-scaleValue.Font = Enum.Font.GothamBold
-scaleValue.TextSize = 12
-scaleValue.TextXAlignment = Enum.TextXAlignment.Right
-
-local function setScaleVisual(scale)
-	-- scale 0.7 ~ 1.3  →  ratio 0 ~ 1
-	local ratio = math.clamp((scale - 0.7) / 0.6, 0, 1)
-	scaleFill.Size = UDim2.new(ratio, 0, 1, 0)
-	scaleThumb.Position = UDim2.new(ratio, -7, 0.5, -7)
-	scaleValue.Text = math.floor(scale * 100) .. "%"
-end
-setScaleVisual(uiScale)
-
-local function applyScale(scale)
-	uiScale = math.clamp(scale, 0.7, 1.3)
-	setScaleVisual(uiScale)
-	if customSizeEnabled then
-		applyUISize()
-	end
-end
-
-local scaleDragging = false
-local function updateScale(input)
-	local rel = (input.Position.X - scaleBg.AbsolutePosition.X) / scaleBg.AbsoluteSize.X
-	local scale = 0.7 + math.clamp(rel, 0, 1) * 0.6
-	applyScale(scale)
-end
-scaleBg.InputBegan:Connect(function(i)
-	if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-		scaleDragging = true
-		updateScale(i)
-	end
-end)
-UIS.InputChanged:Connect(function(i)
-	if scaleDragging then updateScale(i) end
-end)
-UIS.InputEnded:Connect(function(i)
-	if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-		scaleDragging = false
-	end
-end)
-
-local sizeOn = false
-local function setSizeToggleVisual(state)
-	sizeOn = state
-	if state then
-		TweenService:Create(sizeTrack, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(140, 100, 255)}):Play()
-		TweenService:Create(sizeThumb, TweenInfo.new(0.15, Enum.EasingStyle.Quint), {
-			Position = UDim2.new(1, -18, 0.5, -8),
-			BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-		}):Play()
-		scaleRow.Visible = true
-	else
-		TweenService:Create(sizeTrack, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(50, 50, 70)}):Play()
-		TweenService:Create(sizeThumb, TweenInfo.new(0.15, Enum.EasingStyle.Quint), {
-			Position = UDim2.new(0, 2, 0.5, -8),
-			BackgroundColor3 = Color3.fromRGB(180, 180, 200)
-		}):Play()
-		scaleRow.Visible = false
-		-- reset to default
-		uiScale = 1.0
-		applyUISize()
-		setScaleVisual(1.0)
-	end
-end
-sizeHit.MouseButton1Click:Connect(function()
-	customSizeEnabled = not customSizeEnabled
-	setSizeToggleVisual(customSizeEnabled)
-	if customSizeEnabled then
-		applyUISize()
-	end
-end)
 
 local function refreshLanguage()
 	tab1Text.Text = T("player")
@@ -1516,6 +1352,19 @@ langBtn.MouseButton1Click:Connect(function()
 	currentLang = currentLang == "th" and "en" or "th"
 	refreshLanguage()
 end)
+
+-- ปรับขนาดอัตโนมัติเมื่อหน้าจอเปลี่ยน (หมุนจอ / เปลี่ยนอุปกรณ์)
+if workspace.CurrentCamera then
+	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+		local newW, newH = getUISize()
+		uiW, uiH = newW, newH
+		frameOpenSize = UDim2.new(0, uiW, 0, uiH)
+		if not isMinimized then
+			frame.Size = frameOpenSize
+			frame.Position = UDim2.new(0.5, -uiW/2, 0.5, -uiH/2)
+		end
+	end)
+end
 
 player.CharacterAdded:Connect(function()
 	humanoid = getHumanoid()
