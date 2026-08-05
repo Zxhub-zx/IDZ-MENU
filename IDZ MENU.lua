@@ -7,6 +7,7 @@ local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
+local Teams = game:GetService("Teams")
 
 local flyEnabled = false
 local speedEnabled = false
@@ -18,12 +19,10 @@ local nightVisionEnabled = false
 local clickTPEnabled = false
 local fpsBoostEnabled = false
 local aimbotEnabled = false
-
 local aimbotTargetType = "player"
 local aimbotRangeMode = "close"
 local aimbotCloseRange = 60
 local aimbotFarRange = 220
-
 local flySpeed = 8
 local walkSpeed = 16
 local jumpPower = 50
@@ -57,7 +56,10 @@ local L = {
 		targetNpc = "บอท",
 		rangeClose = "ใกล้",
 		rangeFar = "ไกล",
-		enableAimbot = "เปิด Aimbot"
+		enableAimbot = "เปิด Aimbot",
+		aimbotPanel = "IDZ MENU AIMBOT",
+		on = "on",
+		off = "off"
 	},
 	en = {
 		player = "Player",
@@ -79,7 +81,10 @@ local L = {
 		targetNpc = "NPCs",
 		rangeClose = "Close",
 		rangeFar = "Far",
-		enableAimbot = "Enable Aimbot"
+		enableAimbot = "Enable Aimbot",
+		aimbotPanel = "IDZ MENU AIMBOT",
+		on = "on",
+		off = "off"
 	}
 }
 local function T(key)
@@ -107,24 +112,9 @@ gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- ================= RESPONSIVE SIZE =================
-local function getUISize()
-	local cam = workspace.CurrentCamera
-	local vs = (cam and cam.ViewportSize) or Vector2.new(1280, 720)
-	-- มือถือ / ไอแพด / คอม ปรับขนาดให้อยู่ในขอบเขตที่เหมาะสม
-	local w = math.clamp(math.floor(vs.X * 0.72), 300, 560)
-	local h = math.clamp(math.floor(vs.Y * 0.68), 340, 460)
-	-- ถ้าจอแคบมาก (มือถือแนวตั้ง) ให้แคบลงอีกนิด
-	if vs.X < 500 then
-		w = math.clamp(math.floor(vs.X * 0.92), 280, 400)
-		h = math.clamp(math.floor(vs.Y * 0.62), 320, 420)
-	end
-	return w, h
-end
+-- ================= FIXED SIZE =================
+local uiW, uiH = 520, 420
 
-local uiW, uiH = getUISize()
-
--- ================= MAIN WINDOW =================
 local frame = Instance.new("Frame", gui)
 frame.Size = UDim2.new(0, uiW, 0, uiH)
 frame.Position = UDim2.new(0.5, -uiW/2, 0.5, -uiH/2)
@@ -207,7 +197,7 @@ closeBtn.MouseLeave:Connect(function()
 end)
 
 -- ================= SIDEBAR =================
-local sideW = math.clamp(math.floor(uiW * 0.26), 110, 140)
+local sideW = 130
 local sidebar = Instance.new("Frame", frame)
 sidebar.Size = UDim2.new(0, sideW, 1, -42)
 sidebar.Position = UDim2.new(0, 0, 0, 42)
@@ -224,7 +214,6 @@ local function createSidebarBtn(text, icon, y)
 	btn.Text = ""
 	btn.AutoButtonColor = false
 	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
-
 	local iconLbl = Instance.new("TextLabel", btn)
 	iconLbl.Size = UDim2.new(0, 26, 1, 0)
 	iconLbl.Position = UDim2.new(0, 6, 0, 0)
@@ -234,7 +223,6 @@ local function createSidebarBtn(text, icon, y)
 	iconLbl.Font = Enum.Font.GothamBold
 	iconLbl.TextSize = 14
 	iconLbl.TextXAlignment = Enum.TextXAlignment.Center
-
 	local txt = Instance.new("TextLabel", btn)
 	txt.Size = UDim2.new(1, -36, 1, 0)
 	txt.Position = UDim2.new(0, 32, 0, 0)
@@ -245,7 +233,6 @@ local function createSidebarBtn(text, icon, y)
 	txt.TextSize = 12
 	txt.TextXAlignment = Enum.TextXAlignment.Left
 	txt.TextTruncate = Enum.TextTruncate.AtEnd
-
 	return btn, iconLbl, txt
 end
 
@@ -407,7 +394,6 @@ local function dragify(target, handle)
 end
 dragify(frame, titleBar)
 
--- Opening
 frame.BackgroundTransparency = 1
 frame.Size = UDim2.new(0, uiW, 0, 0)
 task.defer(function()
@@ -417,7 +403,7 @@ task.defer(function()
 	}):Play()
 end)
 
--- ================= MOBILE CONTROLS (ขนาดเล็กลงนิด) =================
+-- ================= MOBILE =================
 local function styleMobile(btn)
 	btn.BackgroundColor3 = Color3.fromRGB(28, 26, 42)
 	btn.BackgroundTransparency = 0.15
@@ -492,7 +478,7 @@ bind(moveBackBtn, "back")
 bind(moveLeftBtn, "left")
 bind(moveRightBtn, "right")
 
--- ================= FEATURES =================
+-- ================= FEATURES (เดิม) =================
 local freecamPart, freecamConn
 local function setMoveButtonsVisible(v)
 	moveForwardBtn.Visible = v
@@ -794,21 +780,144 @@ local function stopFPSBoost()
 	end)
 end
 
+-- ================= AIMBOT + TEAM SYSTEM =================
 local aimbotConn
+local teamHighlights = {} -- [player] = Highlight
+
+local TEAM_COLORS = {
+	own = Color3.fromRGB(40, 120, 255),      -- น้ำเงิน (ทีมเรา)
+	enemy = Color3.fromRGB(220, 40, 40),     -- แดง (ศัตรู)
+	third = Color3.fromRGB(255, 180, 40),    -- ส้ม (ทีมที่ 3)
+	fourth = Color3.fromRGB(40, 220, 120),   -- เขียว
+	neutral = Color3.fromRGB(180, 180, 200)
+}
+
+local function getPlayerTeam(plr)
+	if plr.Team then return plr.Team end
+	return nil
+end
+
+local function isEnemy(plr)
+	if plr == player then return false end
+	local myTeam = getPlayerTeam(player)
+	local theirTeam = getPlayerTeam(plr)
+	if myTeam and theirTeam then
+		return myTeam ~= theirTeam
+	end
+	-- ถ้าไม่มีทีม ถือว่าเป็นศัตรูได้ (โหมด FFA)
+	return true
+end
+
+local function detectRole(plr)
+	-- ตรวจบทบาทแบบง่าย (Murder Mystery / เกมที่มีบทบาท)
+	if not plr.Character then return "normal" end
+	local char = plr.Character
+	local tool = char:FindFirstChildOfClass("Tool")
+	if tool then
+		local n = string.lower(tool.Name)
+		if n:find("knife") or n:find("sword") or n:find("murder") or n:find("killer") or n:find("assassin") then
+			return "murderer"
+		end
+		if n:find("gun") or n:find("revolver") or n:find("pistol") or n:find("sheriff") or n:find("police") then
+			return "sheriff"
+		end
+	end
+	-- ตรวจจาก Attribute / Value ที่เกมนิยมใช้
+	local roleVal = plr:FindFirstChild("Role") or char:FindFirstChild("Role")
+	if roleVal and roleVal:IsA("StringValue") then
+		local r = string.lower(roleVal.Value)
+		if r:find("murder") or r:find("killer") or r:find("assassin") then return "murderer" end
+		if r:find("sheriff") or r:find("police") or r:find("hero") then return "sheriff" end
+	end
+	return "normal"
+end
+
+local function getTeamColor(plr)
+	if plr == player then return TEAM_COLORS.own end
+	local myTeam = getPlayerTeam(player)
+	local theirTeam = getPlayerTeam(plr)
+	if not myTeam or not theirTeam then
+		return TEAM_COLORS.enemy
+	end
+	if myTeam == theirTeam then
+		return TEAM_COLORS.own
+	end
+	-- หลายทีม
+	local teamsList = Teams:GetTeams()
+	if #teamsList <= 2 then
+		return TEAM_COLORS.enemy
+	end
+	-- หา index ของทีม
+	local idx = 1
+	for i, t in ipairs(teamsList) do
+		if t == theirTeam then idx = i break end
+	end
+	if idx == 1 then return TEAM_COLORS.enemy
+	elseif idx == 2 then return TEAM_COLORS.third
+	else return TEAM_COLORS.fourth end
+end
+
+local function clearTeamHighlights()
+	for plr, hl in pairs(teamHighlights) do
+		pcall(function() hl:Destroy() end)
+	end
+	teamHighlights = {}
+end
+
+local function updateTeamHighlight(plr)
+	if not plr.Character then return end
+	local existing = teamHighlights[plr]
+	if existing then
+		existing.FillColor = getTeamColor(plr)
+		existing.OutlineColor = getTeamColor(plr)
+		return
+	end
+	local hl = Instance.new("Highlight")
+	hl.Adornee = plr.Character
+	hl.FillColor = getTeamColor(plr)
+	hl.OutlineColor = getTeamColor(plr)
+	hl.FillTransparency = 0.75
+	hl.OutlineTransparency = 0.2
+	hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	hl.Parent = gui
+	teamHighlights[plr] = hl
+end
+
+local function refreshAllTeamHighlights()
+	for _, p in ipairs(game.Players:GetPlayers()) do
+		if p ~= player and p.Character then
+			updateTeamHighlight(p)
+		end
+	end
+end
+
 local function getAimbotTargets()
 	local myRoot = getChar():FindFirstChild("HumanoidRootPart")
 	if not myRoot then return {} end
 	local range = aimbotRangeMode == "close" and aimbotCloseRange or aimbotFarRange
 	local list = {}
+
 	if aimbotTargetType == "player" then
+		local myRole = detectRole(player)
 		for _, p in ipairs(game.Players:GetPlayers()) do
 			if p ~= player and p.Character then
 				local hum = p.Character:FindFirstChildOfClass("Humanoid")
 				local root = p.Character:FindFirstChild("HumanoidRootPart")
 				if hum and hum.Health > 0 and root then
 					local dist = (root.Position - myRoot.Position).Magnitude
-					if dist <= range then
-						table.insert(list, {root = root, dist = dist})
+					if dist <= range and isEnemy(p) then
+						local role = detectRole(p)
+						local priority = 1
+						-- ถ้าเราเป็นตำรวจ → ล็อกฆาตกรก่อน
+						if myRole == "sheriff" and role == "murderer" then
+							priority = 10
+						-- ถ้าเราเป็นฆาตกร → ล็อกคนทั่วไป / ตำรวจ
+						elseif myRole == "murderer" and role ~= "murderer" then
+							priority = 8
+						elseif role == "murderer" then
+							priority = 6
+						end
+						table.insert(list, {root = root, dist = dist, priority = priority, plr = p})
 					end
 				end
 			end
@@ -822,20 +931,32 @@ local function getAimbotTargets()
 					if root then
 						local dist = (root.Position - myRoot.Position).Magnitude
 						if dist <= range then
-							table.insert(list, {root = root, dist = dist})
+							table.insert(list, {root = root, dist = dist, priority = 1})
 						end
 					end
 				end
 			end
 		end
 	end
-	table.sort(list, function(a, b) return a.dist < b.dist end)
+
+	table.sort(list, function(a, b)
+		if a.priority ~= b.priority then return a.priority > b.priority end
+		return a.dist < b.dist
+	end)
 	return list
 end
+
 local function startAimbot()
 	if aimbotConn then aimbotConn:Disconnect() end
+	refreshAllTeamHighlights()
 	aimbotConn = RunService.RenderStepped:Connect(function()
 		if not aimbotEnabled then return end
+		-- อัปเดตไฮไลต์ทีม
+		for _, p in ipairs(game.Players:GetPlayers()) do
+			if p ~= player and p.Character then
+				updateTeamHighlight(p)
+			end
+		end
 		local targets = getAimbotTargets()
 		if #targets == 0 then return end
 		local targetRoot = targets[1].root
@@ -847,8 +968,93 @@ local function startAimbot()
 		cam.CFrame = currentCF:Lerp(goalCF, 0.32)
 	end)
 end
+
 local function stopAimbot()
 	if aimbotConn then aimbotConn:Disconnect() aimbotConn = nil end
+	clearTeamHighlights()
+end
+
+-- ================= SEPARATE AIMBOT UI =================
+local aimbotPanel = Instance.new("Frame", gui)
+aimbotPanel.Size = UDim2.new(0, 220, 0, 100)
+aimbotPanel.Position = UDim2.new(0.5, -110, 0.15, 0)
+aimbotPanel.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+aimbotPanel.BackgroundTransparency = 0.08
+aimbotPanel.Visible = false
+aimbotPanel.ZIndex = 90
+Instance.new("UICorner", aimbotPanel).CornerRadius = UDim.new(0, 14)
+local apStroke = Instance.new("UIStroke", aimbotPanel)
+apStroke.Color = Color3.fromRGB(100, 70, 180)
+apStroke.Thickness = 1.4
+apStroke.Transparency = 0.3
+
+local apTitle = Instance.new("TextLabel", aimbotPanel)
+apTitle.Size = UDim2.new(1, -20, 0, 28)
+apTitle.Position = UDim2.new(0, 10, 0, 8)
+apTitle.BackgroundTransparency = 1
+apTitle.Text = T("aimbotPanel")
+apTitle.TextColor3 = Color3.fromRGB(140, 220, 140)
+apTitle.Font = Enum.Font.GothamBold
+apTitle.TextSize = 15
+apTitle.TextXAlignment = Enum.TextXAlignment.Center
+apTitle.ZIndex = 91
+
+local apBtn = Instance.new("TextButton", aimbotPanel)
+apBtn.Size = UDim2.new(1, -24, 0, 42)
+apBtn.Position = UDim2.new(0, 12, 0, 42)
+apBtn.BackgroundColor3 = Color3.fromRGB(180, 30, 40)
+apBtn.Text = T("off")
+apBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+apBtn.Font = Enum.Font.GothamBold
+apBtn.TextSize = 20
+apBtn.AutoButtonColor = false
+apBtn.ZIndex = 91
+Instance.new("UICorner", apBtn).CornerRadius = UDim.new(0, 10)
+
+local function updateAimbotPanelVisual(state)
+	if state then
+		apBtn.BackgroundColor3 = Color3.fromRGB(40, 160, 80)
+		apBtn.Text = T("on")
+	else
+		apBtn.BackgroundColor3 = Color3.fromRGB(180, 30, 40)
+		apBtn.Text = T("off")
+	end
+end
+
+apBtn.MouseButton1Click:Connect(function()
+	aimbotEnabled = not aimbotEnabled
+	updateAimbotPanelVisual(aimbotEnabled)
+	if aimbotEnabled then
+		startAimbot()
+	else
+		stopAimbot()
+	end
+end)
+
+-- ลากแผง Aimbot ได้
+do
+	local drag, start, pos = false
+	aimbotPanel.InputBegan:Connect(function(i)
+		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+			drag = true
+			start = i.Position
+			pos = aimbotPanel.Position
+		end
+	end)
+	UIS.InputChanged:Connect(function(i)
+		if drag then
+			local d = i.Position - start
+			aimbotPanel.Position = UDim2.new(pos.X.Scale, pos.X.Offset + d.X, pos.Y.Scale, pos.Y.Offset + d.Y)
+		end
+	end)
+	UIS.InputEnded:Connect(function() drag = false end)
+end
+
+local function showAimbotPanel(show)
+	aimbotPanel.Visible = show
+	if show then
+		updateAimbotPanelVisual(aimbotEnabled)
+	end
 end
 
 -- ================= CREATE ROW =================
@@ -861,7 +1067,6 @@ local function createRow(parent, key, y, getVal, setVal, toggle, noSlider, maxOv
 	row.BackgroundTransparency = 0.25
 	row.BorderSizePixel = 0
 	Instance.new("UICorner", row).CornerRadius = UDim.new(0, 9)
-
 	local label = Instance.new("TextLabel", row)
 	label.Size = UDim2.new(0, 130, 1, 0)
 	label.Position = UDim2.new(0, 12, 0, 0)
@@ -872,7 +1077,6 @@ local function createRow(parent, key, y, getVal, setVal, toggle, noSlider, maxOv
 	label.TextSize = 12
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	table.insert(rowLabels, {label = label, key = key})
-
 	local track = Instance.new("Frame", row)
 	track.Size = UDim2.new(0, 40, 0, 20)
 	track.Position = UDim2.new(1, -50, 0.5, -10)
@@ -888,7 +1092,6 @@ local function createRow(parent, key, y, getVal, setVal, toggle, noSlider, maxOv
 	hit.BackgroundTransparency = 1
 	hit.Text = ""
 	hit.ZIndex = 5
-
 	local on = false
 	local function setVisual(state)
 		on = state
@@ -910,7 +1113,6 @@ local function createRow(parent, key, y, getVal, setVal, toggle, noSlider, maxOv
 		setVisual(not on)
 		toggle(on)
 	end)
-
 	if not noSlider then
 		local maxV = maxOverride or 500
 		local bg = Instance.new("Frame", row)
@@ -939,7 +1141,6 @@ local function createRow(parent, key, y, getVal, setVal, toggle, noSlider, maxOv
 		box.ClearTextOnFocus = true
 		box.TextXAlignment = Enum.TextXAlignment.Center
 		Instance.new("UICorner", box).CornerRadius = UDim.new(0, 5)
-
 		local function apply(v)
 			v = math.clamp(math.floor(v), 0, maxV)
 			local r = v / maxV
@@ -971,50 +1172,19 @@ local function createRow(parent, key, y, getVal, setVal, toggle, noSlider, maxOv
 end
 
 -- PAGE 1
-createRow(page1, "fly", 6,
-	function() return flySpeed end,
-	function(v) flySpeed = v end,
-	function(s) flyEnabled = s if s then startFly() else stopFly() end end
-)
-createRow(page1, "speed", 58,
-	function() return walkSpeed end,
-	function(v) walkSpeed = v if speedEnabled then humanoid.WalkSpeed = v end end,
-	function(s) speedEnabled = s humanoid.WalkSpeed = s and walkSpeed or 16 end
-)
-createRow(page1, "jump", 110,
-	function() return jumpPower end,
-	function(v) jumpPower = v if jumpEnabled then humanoid.JumpPower = v end end,
-	function(s) jumpEnabled = s humanoid.JumpPower = s and jumpPower or 50 end
-)
-createRow(page1, "noclip", 162,
-	function() return 0 end, function() end,
-	function(s) noclipEnabled = s if s then startNoclip() else stopNoclip() end end, true
-)
-createRow(page1, "night", 214,
-	function() return 0 end, function() end,
-	function(s) nightVisionEnabled = s if s then startNightVision() else stopNightVision() end end, true
-)
+createRow(page1, "fly", 6, function() return flySpeed end, function(v) flySpeed = v end, function(s) flyEnabled = s if s then startFly() else stopFly() end end)
+createRow(page1, "speed", 58, function() return walkSpeed end, function(v) walkSpeed = v if speedEnabled then humanoid.WalkSpeed = v end end, function(s) speedEnabled = s humanoid.WalkSpeed = s and walkSpeed or 16 end)
+createRow(page1, "jump", 110, function() return jumpPower end, function(v) jumpPower = v if jumpEnabled then humanoid.JumpPower = v end end, function(s) jumpEnabled = s humanoid.JumpPower = s and jumpPower or 50 end)
+createRow(page1, "noclip", 162, function() return 0 end, function() end, function(s) noclipEnabled = s if s then startNoclip() else stopNoclip() end end, true)
+createRow(page1, "night", 214, function() return 0 end, function() end, function(s) nightVisionEnabled = s if s then startNightVision() else stopNightVision() end end, true)
 
 -- PAGE 2
-createRow(page2, "esp", 6,
-	function() return 0 end, function() end,
-	function(s) espEnabled = s if s then startESP() else stopESP() end end, true
-)
-createRow(page2, "freecam", 58,
-	function() return freecamSpeed end,
-	function(v) freecamSpeed = v end,
-	function(s) freecamEnabled = s if s then startFreecam() else stopFreecam() end end, false, 5
-)
-createRow(page2, "clicktp", 110,
-	function() return 0 end, function() end,
-	function(s) clickTPEnabled = s if s then startClickTP() else stopClickTP() end end, true
-)
-createRow(page2, "fps", 162,
-	function() return 0 end, function() end,
-	function(s) fpsBoostEnabled = s if s then startFPSBoost() else stopFPSBoost() end end, true
-)
+createRow(page2, "esp", 6, function() return 0 end, function() end, function(s) espEnabled = s if s then startESP() else stopESP() end end, true)
+createRow(page2, "freecam", 58, function() return freecamSpeed end, function(v) freecamSpeed = v end, function(s) freecamEnabled = s if s then startFreecam() else stopFreecam() end end, false, 5)
+createRow(page2, "clicktp", 110, function() return 0 end, function() end, function(s) clickTPEnabled = s if s then startClickTP() else stopClickTP() end end, true)
+createRow(page2, "fps", 162, function() return 0 end, function() end, function(s) fpsBoostEnabled = s if s then startFPSBoost() else stopFPSBoost() end end, true)
 
--- ================= AIMBOT =================
+-- ================= AIMBOT (ในเมนู) =================
 local AIM_ROW_Y = 214
 local AIM_PANEL_HEIGHT = 148
 
@@ -1139,58 +1309,20 @@ farOpt.MouseButton1Click:Connect(function()
 end)
 updateRangeVisual()
 
-local aimToggleRow = Instance.new("Frame", aimPanel)
-aimToggleRow.Size = UDim2.new(1, -16, 0, 32)
-aimToggleRow.Position = UDim2.new(0, 8, 0, 120)
-aimToggleRow.BackgroundTransparency = 1
+-- ปุ่มเรียก UI แยก (แทน toggle เดิม)
+local callPanelBtn = Instance.new("TextButton", aimPanel)
+callPanelBtn.Size = UDim2.new(1, -20, 0, 32)
+callPanelBtn.Position = UDim2.new(0, 10, 0, 120)
+callPanelBtn.BackgroundColor3 = Color3.fromRGB(100, 60, 200)
+callPanelBtn.Text = "เรียก UI Aimbot"
+callPanelBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+callPanelBtn.Font = Enum.Font.GothamBold
+callPanelBtn.TextSize = 13
+callPanelBtn.AutoButtonColor = false
+Instance.new("UICorner", callPanelBtn).CornerRadius = UDim.new(0, 8)
 
-local aimToggleLabel = Instance.new("TextLabel", aimToggleRow)
-aimToggleLabel.Size = UDim2.new(0, 120, 1, 0)
-aimToggleLabel.BackgroundTransparency = 1
-aimToggleLabel.Text = T("enableAimbot")
-aimToggleLabel.TextColor3 = Color3.fromRGB(210, 210, 230)
-aimToggleLabel.Font = Enum.Font.GothamBold
-aimToggleLabel.TextSize = 12
-aimToggleLabel.TextXAlignment = Enum.TextXAlignment.Left
-table.insert(rowLabels, {label = aimToggleLabel, key = "enableAimbot"})
-
-local aimTrack = Instance.new("Frame", aimToggleRow)
-aimTrack.Size = UDim2.new(0, 40, 0, 20)
-aimTrack.Position = UDim2.new(1, -46, 0.5, -10)
-aimTrack.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-Instance.new("UICorner", aimTrack).CornerRadius = UDim.new(1, 0)
-local aimThumb = Instance.new("Frame", aimTrack)
-aimThumb.Size = UDim2.new(0, 16, 0, 16)
-aimThumb.Position = UDim2.new(0, 2, 0.5, -8)
-aimThumb.BackgroundColor3 = Color3.fromRGB(180, 180, 200)
-Instance.new("UICorner", aimThumb).CornerRadius = UDim.new(1, 0)
-local aimHit = Instance.new("TextButton", aimTrack)
-aimHit.Size = UDim2.new(1, 0, 1, 0)
-aimHit.BackgroundTransparency = 1
-aimHit.Text = ""
-aimHit.ZIndex = 5
-
-local aimOn = false
-local function setAimVisual(state)
-	aimOn = state
-	if state then
-		TweenService:Create(aimTrack, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(140, 100, 255)}):Play()
-		TweenService:Create(aimThumb, TweenInfo.new(0.15, Enum.EasingStyle.Quint), {
-			Position = UDim2.new(1, -18, 0.5, -8),
-			BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-		}):Play()
-	else
-		TweenService:Create(aimTrack, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(50, 50, 70)}):Play()
-		TweenService:Create(aimThumb, TweenInfo.new(0.15, Enum.EasingStyle.Quint), {
-			Position = UDim2.new(0, 2, 0.5, -8),
-			BackgroundColor3 = Color3.fromRGB(180, 180, 200)
-		}):Play()
-	end
-end
-aimHit.MouseButton1Click:Connect(function()
-	setAimVisual(not aimOn)
-	aimbotEnabled = aimOn
-	if aimOn then startAimbot() else stopAimbot() end
+callPanelBtn.MouseButton1Click:Connect(function()
+	showAimbotPanel(not aimbotPanel.Visible)
 end)
 
 -- ================= TELEPORT =================
@@ -1263,18 +1395,15 @@ local function updateTPList()
 	listScroll.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 4)
 end
 
--- ================= SMART LAYOUT =================
 local aimOpen = false
 local tpOpen = false
 
 local function refreshLayout()
 	local aimH = aimOpen and AIM_PANEL_HEIGHT or 0
 	local tpH = tpOpen and 140 or 0
-
 	TweenService:Create(aimPanel, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {
 		Size = UDim2.new(1, -16, 0, aimH)
 	}):Play()
-
 	local tpY = AIM_ROW_Y + 46 + aimH + 6
 	TweenService:Create(tpRow, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {
 		Position = UDim2.new(0, 8, 0, tpY)
@@ -1283,9 +1412,7 @@ local function refreshLayout()
 		Position = UDim2.new(0, 8, 0, tpY + 46),
 		Size = UDim2.new(1, -16, 0, tpH)
 	}):Play()
-
-	local totalH = tpY + 46 + tpH + 24
-	page2.CanvasSize = UDim2.new(0, 0, 0, math.max(totalH, 360))
+	page2.CanvasSize = UDim2.new(0, 0, 0, math.max(tpY + 46 + tpH + 24, 360))
 end
 
 local aimClick = Instance.new("TextButton", aimRow)
@@ -1308,7 +1435,6 @@ tpClick.MouseButton1Click:Connect(function()
 	if tpOpen then updateTPList() end
 	refreshLayout()
 end)
-
 refreshLayout()
 
 -- PAGE 3
@@ -1343,6 +1469,8 @@ local function refreshLanguage()
 	npcOpt.Text = T("targetNpc")
 	closeOpt.Text = T("rangeClose")
 	farOpt.Text = T("rangeFar")
+	apTitle.Text = T("aimbotPanel")
+	updateAimbotPanelVisual(aimbotEnabled)
 	for _, item in ipairs(rowLabels) do
 		item.label.Text = T(item.key)
 	end
@@ -1352,19 +1480,6 @@ langBtn.MouseButton1Click:Connect(function()
 	currentLang = currentLang == "th" and "en" or "th"
 	refreshLanguage()
 end)
-
--- ปรับขนาดอัตโนมัติเมื่อหน้าจอเปลี่ยน (หมุนจอ / เปลี่ยนอุปกรณ์)
-if workspace.CurrentCamera then
-	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
-		local newW, newH = getUISize()
-		uiW, uiH = newW, newH
-		frameOpenSize = UDim2.new(0, uiW, 0, uiH)
-		if not isMinimized then
-			frame.Size = frameOpenSize
-			frame.Position = UDim2.new(0.5, -uiW/2, 0.5, -uiH/2)
-		end
-	end)
-end
 
 player.CharacterAdded:Connect(function()
 	humanoid = getHumanoid()
@@ -1376,4 +1491,12 @@ player.CharacterAdded:Connect(function()
 	if clickTPEnabled then task.wait(0.6) startClickTP() end
 	if fpsBoostEnabled then task.wait(0.3) startFPSBoost() end
 	if aimbotEnabled then task.wait(0.4) startAimbot() end
+end)
+
+-- เคลียร์ highlight เมื่อผู้เล่นออก
+game.Players.PlayerRemoving:Connect(function(p)
+	if teamHighlights[p] then
+		pcall(function() teamHighlights[p]:Destroy() end)
+		teamHighlights[p] = nil
+	end
 end)
